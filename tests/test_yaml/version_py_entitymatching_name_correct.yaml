@@ -6,7 +6,7 @@ package:
   version: {{ version }}
 
 source:
-  url: https://files.pythonhosted.org/packages/3d/77/81c61707e98558cadac41f7e7aaf15f217cdd5cc6f106fdec57d8b36eff3/py-entitymatching-{{ version }}.tar.gz
+  url: https://pypi.org/packages/source/p/py-entitymatching/py-entitymatching-{{ version }}.tar.gz
   sha256: {{ sha256 }}
 
 build:

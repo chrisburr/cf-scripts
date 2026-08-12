@@ -279,24 +279,54 @@ def _try_pypi_api(url_tmpl: str, context: MutableMapping, hash_type: str, cmeta:
                 break
 
     if name_tmpl is not None:
-        new_url_tmpl = os.path.join(bn, name_tmpl + "-" + "{{ version }}" + ext)
+        fname_tmpl = name_tmpl + "-" + "{{ version }}" + ext
     else:
-        new_url_tmpl = os.path.join(
-            bn, finfo["filename"].replace(context["version"], "{{ version }}")
-        )
+        fname_tmpl = finfo["filename"].replace(context["version"], "{{ version }}")
 
-    logger.debug("new url template from PyPI API: %s", new_url_tmpl)
-    url = _render_jinja2(new_url_tmpl, context)
-    new_hash = _try_url_and_hash_it(url, hash_type)
-    if new_hash is not None:
-        return new_url_tmpl, new_hash
+    # The index reports the hash of every file it lists, so for a URL that PyPI
+    # itself vouches for there is nothing to download. This matters because the
+    # CDN can take several minutes to serve a freshly uploaded release: hashing
+    # by download fails during that window, which used to push us onto the
+    # content-addressed URL below.
+    index_hash = (finfo.get("hashes") or {}).get(hash_type)
 
-    new_url_tmpl = finfo["url"].replace(context["version"], "{{ version }}")
-    logger.debug("new url template from PyPI API: %s", new_url_tmpl)
-    url = _render_jinja2(new_url_tmpl, context)
-    new_hash = _try_url_and_hash_it(url, hash_type)
-    if new_hash is not None:
-        return new_url_tmpl, new_hash
+    # `/packages/source/` is stable across releases, whereas the URL the index
+    # reports is content-addressed - its path segments are a hash of *this*
+    # file, so it is only ever correct for this one version. Writing that into a
+    # recipe means no later version bump can render a working URL, so only offer
+    # it to recipes that already use that form.
+    index_name = data.get("name", orig_pypi_name)
+    canonical_url_tmpl = "/".join(
+        ["https://pypi.org/packages/source", index_name[0], index_name, fname_tmpl]
+    )
+    canonical_url = _render_jinja2(canonical_url_tmpl, context)
+    vouched_urls = {
+        canonical_url,
+        # pypi.io is a legacy alias of pypi.org and still redirects to it
+        canonical_url.replace("https://pypi.org/", "https://pypi.io/"),
+        finfo["url"],
+    }
+
+    new_url_tmpls = [os.path.join(bn, fname_tmpl), canonical_url_tmpl]
+    if "/files.pythonhosted.org/" in url_tmpl:
+        new_url_tmpls.append(finfo["url"].replace(context["version"], "{{ version }}"))
+
+    seen = set()
+    for new_url_tmpl in new_url_tmpls:
+        if new_url_tmpl in seen:
+            continue
+        seen.add(new_url_tmpl)
+
+        logger.debug("new url template from PyPI API: %s", new_url_tmpl)
+        url = _render_jinja2(new_url_tmpl, context)
+
+        if index_hash is not None and url in vouched_urls:
+            logger.debug("hash from PyPI API: %s", index_hash)
+            return new_url_tmpl, index_hash
+
+        new_hash = _try_url_and_hash_it(url, hash_type)
+        if new_hash is not None:
+            return new_url_tmpl, new_hash
 
     return None, None
 
