@@ -312,6 +312,31 @@ class MigrationYaml(GraphMigrator):
             self.top_level = {node for node in self.top_level if node in all_successors}
             self._init_kwargs["top_level"] = top_level
 
+    def predecessor_already_migrated(self, attrs: "AttrsTypedDict") -> bool:
+        """Treat a predecessor as built if the feedstock carries this exact migration.
+
+        ``migrate`` writes the migration yaml to ``.ci_support/migrations/<name>.yaml``
+        and the feedstock parser records each such file's ``migration_number`` and
+        ``migrator_ts`` under ``ci_support_migrations``. Both have to match: a
+        bumped number is a distinct migration to the bot (it is part of the uid),
+        and a changed timestamp is a distinct migration to conda-smithy, so a
+        feedstock holding an older copy has not had *this* migration applied.
+        """
+        # Some of the graph nodes have this field as a list due to
+        # a change in the format of the data. We skip this test for
+        # these nodes for now. Once all of the graph data is converted
+        # this bit will be a no-op.
+        if isinstance(attrs.get("ci_support_migrations", None), list):
+            return False
+
+        info = get_keys_default(attrs, ["ci_support_migrations", self.name], {}, None)
+        if not info:
+            return False
+
+        number_matches = info.get("migration_number") == self.obj_version
+        ts_matches = info.get("migrator_ts") == self.loaded_yaml.get("migrator_ts")
+        return number_matches and ts_matches
+
     def filter_not_in_migration(self, attrs, not_bad_str_start=""):
         if super().filter_not_in_migration(attrs, not_bad_str_start):
             return True
