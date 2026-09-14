@@ -88,12 +88,3 @@ jobs:
           python autotick-bot/release.py "${{ steps.version.outputs.NEXT }}"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: update feedstock version
-        if: ${{ (! env.CI_SKIP) && github.event_name != 'pull_request' && github.event_name != 'merge_group' }}
-        uses: beckermr/update-feedstock-version@cb627a11db9e5429959751ab82912fe951648833 # v9
-        with:
-          feedstock: conda-forge-tick-feedstock
-          version: ${{ steps.version.outputs.NEXT }}
-          github-token: ${{ secrets.AUTOTICK_BOT_GH_TOKEN }}
-          automerge: false
