@@ -765,14 +765,14 @@ package:
   category: main
   optional: false
 - name: conda-forge-pinning
-  version: 2026.09.14.19.52.00
+  version: 2026.09.15.12.00.10
   manager: conda
   platform: linux-64
   dependencies: {}
-  url: https://conda.anaconda.org/conda-forge/noarch/conda-forge-pinning-2026.09.14.19.52.00-hd8ed1ab_0.conda
+  url: https://conda.anaconda.org/conda-forge/noarch/conda-forge-pinning-2026.09.15.12.00.10-hd8ed1ab_0.conda
   hash:
-    md5: 8dbb6012ba75ae7f53260b085b502290
-    sha256: 52d1e1914084932cf9721d3b4068ec8063941e5193f336eac2a0500688a34c08
+    md5: b5d17b580bfc6918f0eea5a5f0882f72
+    sha256: cf9f5715d1003463410e5730b54ace51deec28969ac321c36500ac0bb1e2f521
   category: main
   optional: false
 - name: conda-index
@@ -2992,10 +2992,10 @@ package:
   dependencies:
     __glibc: '>=2.17,<3.0.a0'
     libgcc: '>=15'
-  url: https://conda.anaconda.org/conda-forge/linux-64/libsodium-1.0.22-hebe6cf0_2.conda
+  url: https://conda.anaconda.org/conda-forge/linux-64/libsodium-1.0.22-hebe6cf0_3.conda
   hash:
-    md5: 42c585f153c17b790cd01f01553d24a1
-    sha256: 7454c6a7cf27033757f2895bc5e3941fe27604506edd62cf6bc00e50ab015a43
+    md5: 2d14868d78e969226e4ba07444c0dd25
+    sha256: 2f73c05a1ad07e5a2cb43f0b3759cb04505f0c8bef30b43c9db0caa50218bfd8
   category: main
   optional: false
 - name: libsolv
