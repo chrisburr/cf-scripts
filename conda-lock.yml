@@ -765,14 +765,14 @@ package:
   category: main
   optional: false
 - name: conda-forge-pinning
-  version: 2026.09.15.20.14.38
+  version: 2026.09.16.11.22.01
   manager: conda
   platform: linux-64
   dependencies: {}
-  url: https://conda.anaconda.org/conda-forge/noarch/conda-forge-pinning-2026.09.15.20.14.38-hd8ed1ab_0.conda
+  url: https://conda.anaconda.org/conda-forge/noarch/conda-forge-pinning-2026.09.16.11.22.01-hd8ed1ab_0.conda
   hash:
-    md5: f1506190fb64413137f55ecdda2186b9
-    sha256: 604628e7dd7f091df119c84a680d46d695f220a743aea3b781f48199b24cde93
+    md5: ee3569e61701fb6bde8d1c2271a3647b
+    sha256: f05b1656ab90249d71d7c29012cd05abf6e9a3d70559d23db60f18a03835671a
   category: main
   optional: false
 - name: conda-index
