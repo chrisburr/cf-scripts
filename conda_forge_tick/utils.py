@@ -751,6 +751,7 @@ def _parse_recipes(
         else {
             "noarch": build.get("noarch"),
             "number": str(build.get("number")),
+            "python": build.get("python"),
             "script": build.get("script"),
             "run_exports": requirements.get("run_exports"),
         }

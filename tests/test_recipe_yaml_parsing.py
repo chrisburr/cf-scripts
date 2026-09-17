@@ -8,6 +8,7 @@ import pytest
 from conda_forge_tick.feedstock_parser import (
     populate_feedstock_attributes,
 )
+from conda_forge_tick.migrators.migration_yaml import all_noarch
 from conda_forge_tick.utils import (
     _parse_recipe_yaml_requirements,
     _process_recipe_for_pinning,
@@ -39,6 +40,20 @@ def test_parse_validated_recipes():
 
     for key in ["about", "build", "package", "requirements", "source", "extra"]:
         assert recipe_yaml_dict[key] == meta_yaml_dict[key]
+
+
+def test_parse_recipe_yaml_keeps_python_version_independent():
+    """``build.python.version_independent`` marks an abi3 build.
+
+    ``all_noarch(only_python=True)`` reads it to decide that a feedstock does not
+    need rebuilding for every python version, which keeps it out of the python
+    migrations. Dropping the key at parse time made that check unreachable.
+    """
+    text = TEST_RECIPE_YAML_PATH.joinpath("abi3_pkg.yaml").read_text()
+    recipe_yaml_dict = parse_recipe_yaml(text)
+
+    assert recipe_yaml_dict["build"]["python"]["version_independent"] is True
+    assert all_noarch({"meta_yaml": recipe_yaml_dict}, only_python=True)
 
 
 def test_process_recipe_for_pinning():
