@@ -41,8 +41,14 @@ def _flush_io():
 
 
 def _run_git_cmd(cmd, **kwargs):
-    r = subprocess.run(["git"] + cmd, check=True, timeout=GIT_CMD_TIMEOUT, **kwargs)
+    r = subprocess.run(["git"] + cmd, timeout=GIT_CMD_TIMEOUT, **kwargs)
     _flush_io()
+    if r.returncode != 0:
+        raise RuntimeError(
+            "git command '{!r}' failed:\nstdout:\n{}\nstderr:\n{}".format(
+                cmd, r.stdout, r.stderr
+            )
+        )
     return r
 
 
@@ -220,7 +226,7 @@ def _get_files_to_delete(drs_to_deploy) -> set[str]:
 
         with ctx:
             r = subprocess.run(
-                ["git", "diff", "--name-status", "--cached"],
+                ["git", "diff", "--name-status", "--cached", "."],
                 text=True,
                 capture_output=True,
                 check=True,
@@ -291,8 +297,6 @@ def _deploy_via_api(
         else:
             files_done.add(pth)
 
-        time.sleep(1.0 + RNG.uniform(-1, 1) * 0.1)
-
     for pth in tqdm.tqdm(
         files_to_delete, desc="deleting files", ncols=80, file=sys.stdout
     ):
@@ -312,8 +316,6 @@ def _deploy_via_api(
             files_to_try_again.add(pth)
         else:
             files_done.add(pth)
-
-        time.sleep(1.0 + RNG.uniform(-1, 1) * 0.1)
 
     for pth in files_done:
         pth_parts = pth.split("/")
@@ -380,29 +382,31 @@ def deploy(
         if os.path.isdir(dr):
             is_dir = True
             ctx = pushd(dr)
+            extra_cmd = ["."]
         else:
-            ctx = contextlib.nullcontext()
             is_dir = False
+            ctx = contextlib.nullcontext()
+            extra_cmd = [dr]
 
         with ctx:
             # untracked
             _files_to_add = set(
                 _run_git_cmd(
-                    ["ls-files", "-o", "--exclude-standard", dr],
+                    ["ls-files", "-o", "--exclude-standard"] + extra_cmd,
                     capture_output=True,
                     text=True,
                 ).stdout.splitlines(),
             )
             # need to add the other path segment
             if is_dir:
-                _files_to_add = {os.path.join(dr, fn) for fn in files_to_add}
+                _files_to_add = {os.path.join(dr, fn) for fn in _files_to_add}
             files_to_add |= _files_to_add
 
             # changed
             # these come out with the full path
             _files_to_add = set(
                 _run_git_cmd(
-                    ["diff", "--name-only", dr],
+                    ["diff", "--name-only"] + extra_cmd,
                     capture_output=True,
                     text=True,
                 ).stdout.splitlines(),
@@ -413,7 +417,7 @@ def deploy(
             # these come out with the full path
             _files_to_add = set(
                 _run_git_cmd(
-                    ["diff", "--name-only", "--cached", "--diff-filter=d", dr],
+                    ["diff", "--name-only", "--cached", "--diff-filter=d"] + extra_cmd,
                     capture_output=True,
                     text=True,
                 ).stdout.splitlines(),
@@ -445,31 +449,34 @@ def deploy(
     print("found %d files to add" % len(files_to_add), flush=True)
     print("found %d files to delete" % len(files_to_delete), flush=True)
 
-    if not git_only:
-        files_done, files_to_try_again = _deploy_via_api(files_to_add, files_to_delete)
-        print(
-            f"deployed {len(files_done)} files to graph; {len(files_to_try_again)} did not deploy!",
-            flush=True,
-        )
-        if files_to_try_again:
-            sys.exit(1)
-    else:
-        if (
-            settings().graph_github_backend_repo
-            != settings().versions_github_backend_repo
-        ):
-            raise RuntimeError(
-                "git-based deploys of the graph data do not work for split backends!"
+    if files_to_add or files_to_delete:
+        if not git_only:
+            files_done, files_to_try_again = _deploy_via_api(
+                files_to_add, files_to_delete
             )
-
-        batch = 0
-        n_added = 0
-        while files_to_add:
-            batch += 1
-            n_added += _deploy_batch(
-                files_to_add=files_to_add,
-                n_added=n_added,
-                batch=batch,
+            print(
+                f"deployed {len(files_done)} files to graph; {len(files_to_try_again)} did not deploy!",
+                flush=True,
             )
+            if files_to_try_again:
+                sys.exit(1)
+        else:
+            if (
+                settings().graph_github_backend_repo
+                != settings().versions_github_backend_repo
+            ):
+                raise RuntimeError(
+                    "git-based deploys of the graph data do not work for split backends!"
+                )
 
-        print(f"deployed {n_added} files to graph in {batch} batches", flush=True)
+            batch = 0
+            n_added = 0
+            while files_to_add:
+                batch += 1
+                n_added += _deploy_batch(
+                    files_to_add=files_to_add,
+                    n_added=n_added,
+                    batch=batch,
+                )
+
+            print(f"deployed {n_added} files to graph in {batch} batches", flush=True)
