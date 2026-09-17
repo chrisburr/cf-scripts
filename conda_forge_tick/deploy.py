@@ -228,13 +228,15 @@ def _get_files_to_delete(drs_to_deploy) -> set[str]:
         if os.path.isdir(dr):
             ctx = pushd(dr)
             is_dir = True
+            extra_cmd = ["."]
         else:
             ctx = contextlib.nullcontext()
             is_dir = False
+            extra_cmd = [dr]
 
         with ctx:
             r = subprocess.run(
-                ["git", "diff", "--name-status", "--cached", "."],
+                ["git", "diff", "--name-status", "--cached"] + extra_cmd,
                 text=True,
                 capture_output=True,
                 check=True,
@@ -498,9 +500,13 @@ def deploy(
             if files_to_try_again:
                 sys.exit(1)
         else:
-            if (
-                settings().graph_github_backend_repo
-                != settings().versions_github_backend_repo
+            if not all(
+                repo == settings().graph_github_backend_repo
+                for repo in [
+                    settings().graph_github_backend_repo,
+                    settings().versions_github_backend_repo,
+                    settings().node_attrs_github_backend_repo,
+                ]
             ):
                 raise RuntimeError(
                     "git-based deploys of the graph data do not work for split backends!"

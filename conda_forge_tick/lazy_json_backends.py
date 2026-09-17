@@ -68,6 +68,10 @@ CF_TICK_GRAPH_GITHUB_BACKEND_NUM_DIRS = 5
 HASHMAP_NAME_TO_GITHUB_BACKEND_SETTING_DEFAULT = "graph_github_backend_repo"
 HASHMAP_NAME_TO_GITHUB_BACKEND_SETTING = {
     "versions": "versions_github_backend_repo",
+    "node_attrs": "node_attrs_github_backend_repo",
+    # things without a directory always use the default
+    "lazy_json": HASHMAP_NAME_TO_GITHUB_BACKEND_SETTING_DEFAULT,
+    "": HASHMAP_NAME_TO_GITHUB_BACKEND_SETTING_DEFAULT,
 }
 
 
@@ -107,6 +111,19 @@ def get_sharded_path(file_path, n_dirs=CF_TICK_GRAPH_GITHUB_BACKEND_NUM_DIRS):
         hx = hashlib.sha1(file_name.encode("utf-8")).hexdigest()[0:n_dirs]
         pth_parts = [top_dir] + [hx[i] for i in range(n_dirs)] + [file_name]
         return os.path.join(*pth_parts)
+
+
+def get_sharded_path_and_trim_hashmap_name_if_needed(name, key):
+    """Compute a sharded location for the LazyJson file and trim first path segment if needed."""
+    pth = get_sharded_path(f"{name}/{key}.json")
+
+    # we need to remove the first dir if the repo is not the default one
+    repo_url = get_github_backend_repo_for_hashmap(name)
+    default_repo_url = get_github_backend_repo_for_hashmap("lazy_json")
+    if repo_url != default_repo_url:
+        pth = pth.split("/")
+        pth = "/".join(pth[1:])
+    return pth
 
 
 class LazyJsonBackend(ABC):
@@ -298,19 +315,6 @@ class ReadOnlyFileLazyJsonBackend(FileLazyJsonBackend):
         self._ignore_write()
 
 
-def get_sharded_path_and_trim_hashmap_name_if_needed(name, key):
-    """Compute a sharded location for the LazyJson file and trim first path segment if needed."""
-    pth = get_sharded_path(f"{name}/{key}.json")
-
-    # we need to remove the first dir if the repo is not the default one
-    repo_url = get_github_backend_repo_for_hashmap(name)
-    default_repo_url = get_github_backend_repo_for_hashmap("lazy_json")
-    if repo_url != default_repo_url:
-        pth = pth.split("/")
-        pth = "/".join(pth[1:])
-    return pth
-
-
 class GithubLazyJsonBackend(LazyJsonBackend):
     """
     Read-only backend that makes live requests to https://raw.githubusercontent.com
@@ -325,10 +329,13 @@ class GithubLazyJsonBackend(LazyJsonBackend):
     def __init__(self) -> None:
         self._graph_base_url = settings().graph_github_backend_raw_base_url
         self._versions_base_url = settings().versions_github_backend_raw_base_url
+        self._node_attrs_base_url = settings().node_attrs_github_backend_raw_base_url
 
     def _get_base_url(self, name: str) -> str:
         if name == "versions":
             return self._versions_base_url
+        elif name == "node_attrs":
+            return self._node_attrs_base_url
         else:
             return self._graph_base_url
 
@@ -446,13 +453,18 @@ class GithubAPILazyJsonBackend(LazyJsonBackend):
         self._graph_repo = self._gh.get_repo(
             get_github_backend_repo_for_hashmap("default")
         )
-        self._version_repo = self._gh.get_repo(
+        self._versions_repo = self._gh.get_repo(
             get_github_backend_repo_for_hashmap("versions")
+        )
+        self._node_attrs_repo = self._gh.get_repo(
+            get_github_backend_repo_for_hashmap("node_attrs")
         )
 
     def _get_repo(self, name: str) -> github.Repository:
         if name == "versions":
-            return self._version_repo
+            return self._versions_repo
+        elif name == "node_attrs":
+            return self._node_attrs_repo
         else:
             return self._graph_repo
 
