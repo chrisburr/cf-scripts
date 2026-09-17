@@ -18,7 +18,7 @@ class TestBotSettings:
         os.environ["CF_TICK_GRAPH_REPO_DEFAULT_BRANCH"] = "mybranch"
         os.environ["RUNNER_DEBUG"] = "1"
         os.environ["CF_TICK_FRAC_UPDATE_UPSTREAM_VERSIONS"] = "0.5"
-        os.environ["CF_TICK_FRAC_MAKE_GRAPH"] = "0.7"
+        os.environ["CF_TICK_FRAC_UPDATE_NODE_ATTRS"] = "0.7"
         os.environ["CF_TICK_VERSIONS_GITHUB_BACKEND_REPO"] = (
             "versions-owner/versions-repo"
         )
@@ -56,7 +56,7 @@ class TestBotSettings:
         )
         assert bot_settings.github_runner_debug is True
         assert bot_settings.frac_update_upstream_versions == 0.5
-        assert bot_settings.frac_make_graph == 0.7
+        assert bot_settings.frac_update_node_attrs == 0.7
 
     def test_defaults(self, temporary_environment):
         os.environ.clear()
@@ -75,7 +75,7 @@ class TestBotSettings:
         assert bot_settings.versions_repo_default_branch == "main"
         assert bot_settings.github_runner_debug is False
         assert 0 <= bot_settings.frac_update_upstream_versions <= 1
-        assert 0 <= bot_settings.frac_make_graph <= 1
+        assert 0 <= bot_settings.frac_update_node_attrs <= 1
 
     def test_env_conda_forge_org(self, temporary_environment):
         os.environ.clear()
@@ -104,7 +104,7 @@ class TestBotSettings:
 
     @pytest.mark.parametrize("value", [-0.1, 1.1])
     @pytest.mark.parametrize(
-        "attribute", ["FRAC_UPDATE_UPSTREAM_VERSIONS", "FRAC_MAKE_GRAPH"]
+        "attribute", ["FRAC_UPDATE_UPSTREAM_VERSIONS", "FRAC_UPDATE_NODE_ATTRS"]
     )
     def test_reject_invalid_fraction(
         self, attribute: str, value: float, temporary_environment
@@ -118,7 +118,7 @@ class TestBotSettings:
 
     @pytest.mark.parametrize("value", [0.0, 1.0])
     @pytest.mark.parametrize(
-        "attribute", ["FRAC_UPDATE_UPSTREAM_VERSIONS", "FRAC_MAKE_GRAPH"]
+        "attribute", ["FRAC_UPDATE_UPSTREAM_VERSIONS", "FRAC_UPDATE_NODE_ATTRS"]
     )
     def test_accept_valid_fraction(
         self, attribute: str, value: float, temporary_environment

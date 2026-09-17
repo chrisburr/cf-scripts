@@ -77,10 +77,10 @@ class BotSettings(BaseSettings):
     """
 
     node_attrs_github_backend_repo: str = Field(
-        "conda-forge/conda-forge-bot-data", pattern=r"^[\w\.-]+/[\w\.-]+$"
+        "conda-forge/conda-forge-bot-data-node_attrs", pattern=r"^[\w\.-]+/[\w\.-]+$"
     )
     """
-    The GitHub repository to deploy node attrs to. Default: "conda-forge/conda-forge-bot-data".
+    The GitHub repository to deploy node attrs to. Default: "conda-forge/conda-forge-bot-data-node_attrs".
     If you change the field name, you must also update the `ENV_GRAPH_NODE_ATTRS_BACKEND_REPO` constant.
     """
 
@@ -141,9 +141,9 @@ class BotSettings(BaseSettings):
     """The batch size used to push upstream version updates to the graph as they are found.
     """
 
-    frac_make_graph: Fraction = 0.1
+    frac_update_node_attrs: Fraction = 1.0
     """
-    The fraction of feedstocks (randomly selected) to update in the make-graph job.
+    The fraction of feedstocks (randomly selected) to update the node attrs in the update nodes job.
     In tests or when debugging, you probably need to set this to 1.0 to update all feedstocks.
     """
 
