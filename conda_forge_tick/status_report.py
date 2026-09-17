@@ -95,6 +95,10 @@ def write_version_migrator_status(migrator, mctx):
 
     for node in version_nodes:
         version_data = LazyJson(f"versions/{node}.json").data
+
+        if node not in gx.nodes:
+            continue
+
         with gx.nodes[f"{node}"]["payload"] as attrs:
             if attrs.get("archived", False):
                 continue
