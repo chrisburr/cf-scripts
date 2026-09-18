@@ -28,6 +28,21 @@ def _graph(parent_payload):
     return gx
 
 
+def _cycle_graph(outside_parent=False):
+    # a and b depend on each other; c depends on a and is outside the cycle.
+    # With outside_parent, "ext" is a parent of a from outside the cycle.
+    gx = nx.DiGraph()
+    for node in ("a", "b", "c"):
+        gx.add_node(node, payload=_payload(node))
+    gx.add_edge("a", "b")
+    gx.add_edge("b", "a")
+    gx.add_edge("a", "c")
+    if outside_parent:
+        gx.add_node("ext", payload=_payload("ext"))
+        gx.add_edge("ext", "a")
+    return gx
+
+
 def test_predecessor_migrated_via_build_platform_counts_as_built():
     # mirrors conda-forge/conda-forge-bot: lapack got linux_riscv64 through a
     # rerender rather than a bot PR, so it has no PRed record at all. Its
@@ -134,3 +149,60 @@ def test_null_conda_forge_yml_sections_do_not_raise():
     )
 
     assert not _arches_are_configured(parent, {"linux_riscv64": "linux_64"})
+
+
+def test_node_in_a_cycle_is_allowed_to_go_first():
+    # every member of a dependency cycle has another member upstream of it, so
+    # none of them can ever report all parents built. nx.descendants never
+    # contains its own source, so the check that was meant to spot this could
+    # not fire and the whole cycle stayed parked as "awaiting parents".
+    migrator = _PlainGraphMigrator(
+        name="test migration",
+        graph=_cycle_graph(),
+        effective_graph=_cycle_graph(),
+    )
+
+    # b is a's only unbuilt parent and is in the cycle with it, so waiting on
+    # it is circular and a is allowed to go first
+    assert not migrator.predecessors_not_yet_built(_payload("a"))
+    assert not migrator.filter_node_not_ready_to_be_migrated(_payload("a"))
+    assert migrator.cycle_of["a"] == frozenset({"a", "b"})
+
+
+def test_node_outside_a_cycle_is_still_blocked_by_unbuilt_parents():
+    migrator = _PlainGraphMigrator(
+        name="test migration",
+        graph=_cycle_graph(),
+        effective_graph=_cycle_graph(),
+    )
+
+    assert migrator.filter_node_not_ready_to_be_migrated(_payload("c"))
+    assert "c" not in migrator.cycle_of
+
+
+def test_unbuilt_parent_outside_the_cycle_still_blocks():
+    # only the predecessors inside our own cycle are circular. "ext" is not in
+    # the cycle and has not been built, so a must still wait for it -- letting
+    # the whole cycle through regardless would migrate it too early.
+    migrator = _PlainGraphMigrator(
+        name="test migration",
+        graph=_cycle_graph(outside_parent=True),
+        effective_graph=_cycle_graph(outside_parent=True),
+    )
+
+    assert migrator.predecessors_not_yet_built(_payload("a"))
+    assert migrator.filter_node_not_ready_to_be_migrated(_payload("a"))
+    assert migrator.cycle_of["a"] == frozenset({"a", "b"})
+
+
+def test_cycle_detection_survives_construction_from_total_graph():
+    # the effective graph is built inside Migrator.__init__, which calls
+    # filter_node_not_ready_to_be_migrated before GraphMigrator.__init__ has
+    # finished. Cycle state therefore cannot be a plain attribute assigned at
+    # the end of __init__ -- doing so raises AttributeError here.
+    migrator = _PlainGraphMigrator(
+        name="test migration",
+        total_graph=_cycle_graph(),
+    )
+
+    assert migrator.cycle_of["a"] == frozenset({"a", "b"})

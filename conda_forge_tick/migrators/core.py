@@ -931,6 +931,30 @@ class GraphMigrator(Migrator):
         self.top_level = self.top_level | graph_top_level
         self._init_kwargs["top_level"] = self.top_level
 
+    @functools.cached_property
+    def cycle_of(self) -> dict[str, frozenset[str]]:
+        """Map each node in a dependency cycle to the members of that cycle.
+
+        A predecessor inside our own cycle is waiting on us in turn, so waiting
+        for it to be built is circular and one of us has to go first.
+        Predecessors outside the cycle are real blockers and are still
+        respected.
+
+        Computed lazily: the effective graph is built from inside
+        ``Migrator.__init__``, which calls ``filter_node_not_ready_to_be_migrated``
+        before ``GraphMigrator.__init__`` has finished, so this cannot be an
+        ordinary attribute assigned in ``__init__``.
+        """
+        out: dict[str, frozenset[str]] = {}
+        if self.graph is None:
+            return out
+        for scc in nx.strongly_connected_components(self.graph):
+            if len(scc) > 1:
+                cycle = frozenset(scc)
+                for node in cycle:
+                    out[node] = cycle
+        return out
+
     def all_predecessors_issued(self, attrs: "AttrsTypedDict") -> bool:
         # Check if all upstreams have been issue and are stale
         if self.graph is None:
@@ -976,6 +1000,7 @@ class GraphMigrator(Migrator):
         # Check if all upstreams have been built
         if self.graph is None:
             raise ValueError("graph is None")
+        cycle = self.cycle_of.get(attrs["feedstock_name"], frozenset())
         for node, payload in _gen_active_feedstocks_payloads(
             self.graph.predecessors(attrs["feedstock_name"]),
             self.graph,
@@ -984,6 +1009,12 @@ class GraphMigrator(Migrator):
                 attrs.get("feedstock_name", None),
                 [],
             ):
+                continue
+
+            if node in cycle:
+                # this predecessor is waiting on us in turn, so waiting for it
+                # would deadlock the cycle; one of us has to go first
+                logger.debug("in a cycle with us: %s", node)
                 continue
 
             if self.predecessor_already_migrated(payload):
@@ -1037,12 +1068,10 @@ class GraphMigrator(Migrator):
         """If true don't act on a node in a migration because it is not ready to be migrated."""
         name = attrs.get("name", "")
 
-        # If in top level or in a cycle don't check for upstreams just build
-        is_top_level = (attrs["feedstock_name"] in self.top_level) or (
-            attrs["feedstock_name"]
-            in nx.descendants(self.graph, attrs["feedstock_name"])
-        )
-        if is_top_level:
+        # Top level nodes have nothing to wait for. Cycles are handled inside
+        # predecessors_not_yet_built, which ignores only the predecessors that
+        # are in the cycle with us.
+        if attrs["feedstock_name"] in self.top_level:
             logger.debug("not filtered %s: top level", name)
             node_is_ready = True
         else:
